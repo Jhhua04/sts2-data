@@ -824,6 +824,31 @@ if target_folder and os.path.exists(target_folder):
         else:
             st.info(f"No valid {'solo' if history_mode == 'SP' else 'multiplayer'} runs found in the specified directory.")
     
+    @st.dialog("Privacy, Terms, & Credits")
+    def show_info_modal():
+        st.markdown("""
+        Data Processing & Privacy -
+        This dashboard is designed to analyze your Slay the Spire 2 run history. All data parsing and visualization are performed in-memory during your active session.
+        
+        No Data Storage: Uploaded save files, run histories, and local file structures are strictly processed temporarily in the session state. None of your gameplay data, Steam IDs, or personal information is saved, logged, or transmitted to any external databases.
+        
+        No Tracking: This tool does not use marketing cookies, track individual users across sessions, or collect personally identifiable information.
+
+        Disclaimer of Liability -
+        This application is provided "as-is" without any warranties, express or implied. While this tool only reads data and does not modify your game client, you assume all responsibility for its use. It is always recommended to maintain regular backups of your local save directories.
+        The developer shall not be held liable for any data loss, game corruption, or unforeseen technical issues arising from the use of this dashboard.
+
+        Affiliation & Credits -
+        This is an unofficial, fan-made project. It is not affiliated with, endorsed by, or sponsored by Mega Crit. Slay the Spire 2 and all related game assets are the property of Mega Crit.
+
+        Built using Python, Streamlit, and Pandas.
+
+        © 2026 Jason Hua. All rights reserved. | https://github.com/Jhhua04/sts2-data
+        """)
+
+    if st.sidebar.button("Privacy, Terms, & Credits"):
+        show_info_modal()
+
     if data_source == "Upload Run Files" and uploaded_files:
             temp_dir.cleanup()
 
