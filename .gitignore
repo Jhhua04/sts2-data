@@ -1,0 +1,12 @@
+# Local secrets / machine-specific config
+.env
+
+# Cached API data (regenerated automatically by get_json.py)
+cards.json
+relics.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
