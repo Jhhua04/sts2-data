@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,3 +217,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+=======
+# Local secrets / machine-specific config
+.env
+
+# Cached API data (regenerated automatically by get_json.py)
+cards.json
+relics.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+>>>>>>> master

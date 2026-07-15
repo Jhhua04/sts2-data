@@ -1,0 +1,206 @@
+{
+  "acts": [
+    "ACT.UNDERDOCKS",
+    "ACT.HIVE",
+    "ACT.GLORY"
+  ],
+  "ascension": 8,
+  "build_id": "v0.99.1",
+  "game_mode": "daily",
+  "killed_by_encounter": "NONE.NONE",
+  "killed_by_event": "EVENT.NEOW",
+  "map_point_history": [
+    [
+      {
+        "map_point_type": "ancient",
+        "player_stats": [
+          {
+            "cards_gained": [
+              {
+                "id": "CARD.MELANCHOLY"
+              },
+              {
+                "id": "CARD.MELANCHOLY"
+              },
+              {
+                "id": "CARD.MELANCHOLY"
+              },
+              {
+                "id": "CARD.MELANCHOLY"
+              },
+              {
+                "id": "CARD.MELANCHOLY"
+              },
+              {
+                "id": "CARD.ENTROPY"
+              },
+              {
+                "id": "CARD.FASTEN"
+              },
+              {
+                "id": "CARD.STRATAGEM"
+              },
+              {
+                "id": "CARD.DISCOVERY"
+              },
+              {
+                "id": "CARD.ETERNAL_ARMOR"
+              }
+            ],
+            "current_gold": 0,
+            "current_hp": 0,
+            "damage_taken": 0,
+            "event_choices": [
+              {
+                "title": {
+                  "key": "SPECIALIZED.title",
+                  "table": "modifiers"
+                }
+              },
+              {
+                "title": {
+                  "key": "ALL_STAR.title",
+                  "table": "modifiers"
+                }
+              }
+            ],
+            "gold_gained": 0,
+            "gold_lost": 0,
+            "gold_spent": 0,
+            "gold_stolen": 0,
+            "hp_healed": 52,
+            "max_hp": 0,
+            "max_hp_gained": 0,
+            "max_hp_lost": 0,
+            "player_id": 1
+          }
+        ],
+        "rooms": [
+          {
+            "model_id": "EVENT.NEOW",
+            "room_type": "event",
+            "turns_taken": 0
+          }
+        ]
+      }
+    ]
+  ],
+  "modifiers": [
+    {
+      "id": "MODIFIER.SPECIALIZED"
+    },
+    {
+      "id": "MODIFIER.ALL_STAR"
+    },
+    {
+      "id": "MODIFIER.NIGHT_TERRORS"
+    }
+  ],
+  "platform_type": "steam",
+  "players": [
+    {
+      "character": "CHARACTER.NECROBINDER",
+      "deck": [
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.STRIKE_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.STRIKE_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.STRIKE_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.STRIKE_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.DEFEND_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.DEFEND_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.DEFEND_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.DEFEND_NECROBINDER"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.BODYGUARD"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.UNLEASH"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.ASCENDERS_BANE"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.MELANCHOLY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.MELANCHOLY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.MELANCHOLY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.MELANCHOLY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.MELANCHOLY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.ENTROPY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.FASTEN"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.STRATAGEM"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.DISCOVERY"
+        },
+        {
+          "floor_added_to_deck": 1,
+          "id": "CARD.ETERNAL_ARMOR"
+        }
+      ],
+      "id": 1,
+      "max_potion_slot_count": 2,
+      "potions": [],
+      "relics": [
+        {
+          "floor_added_to_deck": 1,
+          "id": "RELIC.BOUND_PHYLACTERY"
+        }
+      ]
+    }
+  ],
+  "run_time": 6,
+  "schema_version": 8,
+  "seed": "05_04_2026_1P",
+  "start_time": 1775418998,
+  "was_abandoned": true,
+  "win": false
+}
