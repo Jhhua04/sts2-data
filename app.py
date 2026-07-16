@@ -10,7 +10,7 @@ from wiki_urls import wiki_image_url
 from html_builders import build_enemy_grid_html, build_relic_grid_html, clean_enemy_name, clean_encounter_name
 from ui_styles import SHARED_CSS, TOOLTIP_JS
 import tempfile
-from config import SAVE_FILE_PATH
+from config import SAVE_FILE_PATH, PLAYER_ID
 
 st.set_page_config(page_title="StS2 Run Analytics", layout="wide")
 st.title("🃏 Slay the Spire 2: Run Analytics Dashboard")
@@ -29,17 +29,20 @@ save_file_path = SAVE_FILE_PATH
 
 if data_source == "Demo Data":
     target_folder = "example_runs"
+    player_id = PLAYER_ID
     if not os.path.exists(target_folder):
         st.sidebar.error(f"⚠️ Directory '{target_folder}' not found. Please create it and add example JSON files.")
 
 elif data_source == "Upload Run Files":
+    player_id = None
     uploaded_files = st.sidebar.file_uploader(
         "Upload Slay the Spire 2 RUN files",
         type=["run"],
         accept_multiple_files=True,
         help="Navigate to your AppData/SlaytheSpire2 history folder and upload the RUN files."
     )
-    if uploaded_files:
+    player_id = st.sidebar.text_input("Input your player ID", "", key="input_id")
+    if uploaded_files and player_id:
         temp_dir = tempfile.TemporaryDirectory()
         target_folder = temp_dir.name
         for uploaded_file in uploaded_files:
@@ -50,10 +53,13 @@ elif data_source == "Upload Run Files":
             file_path = os.path.join(target_folder, safe_name)
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
+    elif uploaded_files and not player_id:
+        st.sidebar.warning("⚠️ Please enter your player ID to process uploaded files.")
     else:
         st.info("📤 Upload one or more RUN files in the sidebar to view your custom dashboard.")
 
 elif data_source == "Local Path (Dev)":
+    player_id = PLAYER_ID
     target_folder = st.sidebar.text_input(
         "Enter Run History Folder Path:",
         value= save_file_path if save_file_path else "",
@@ -112,9 +118,9 @@ def load_all_run_data(folder_path):
     parse_run_history.mp_runs.clear()
 
     # Initialize dictionaries locally
-    parse_card_info.read_all_files_in_folder(folder_path)
-    parse_enemy_info.read_all_files_in_folder(folder_path)
-    parse_run_history.read_all_files_in_folder(folder_path)
+    parse_card_info.read_all_files_in_folder(folder_path, player_id)
+    parse_enemy_info.read_all_files_in_folder(folder_path, player_id)
+    parse_run_history.read_all_files_in_folder(folder_path, player_id)
     
     return (
         dict(parse_card_info.cards),
@@ -850,8 +856,7 @@ if target_folder and os.path.exists(target_folder):
         show_info_modal()
 
     if data_source == "Upload Run Files" and uploaded_files:
-            temp_dir.cleanup()
-
+            temp_dir.cleanup()  
 elif target_folder and not os.path.exists(target_folder):
     st.error("Folder path not found. Please check the directory.")
 else:

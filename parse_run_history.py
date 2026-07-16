@@ -55,7 +55,7 @@ def _get_deck(player_entry: dict) -> list:
 
 # ── File reader ───────────────────────────────────────────────────────────────
 
-def read_file(file_path: str):
+def read_file(file_path: str, player_id=PLAYER_ID):
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -89,7 +89,7 @@ def read_file(file_path: str):
     if is_multiplayer:
         # find our player entry
         my_player = next(
-            (p for p in players if p.get("id") == PLAYER_ID), None
+            (p for p in players if p.get("id") == int(player_id)), None
         )
         if my_player is None:
             return
@@ -127,13 +127,13 @@ def read_file(file_path: str):
         })
 
 
-def read_all_files_in_folder(folder_path: str):
+def read_all_files_in_folder(folder_path: str, player_id):
     if not os.path.exists(folder_path):
         print(f"Run history: folder not found: {folder_path}")
         return
     for filename in os.listdir(folder_path):
         if filename.endswith(".run"):
-            read_file(os.path.join(folder_path, filename))
+            read_file(os.path.join(folder_path, filename), player_id)
     # Sort newest first
     solo_runs.sort(key=lambda r: r["timestamp"], reverse=True)
     mp_runs.sort(key=lambda r: r["timestamp"], reverse=True)

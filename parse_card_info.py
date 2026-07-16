@@ -209,7 +209,7 @@ def handle_unknown_choices(point, card_dict: dict, relic_dict: dict):
             handle_relic_choices(point, relic_dict)
 
 
-def _read_file(file_path, card_dict: dict, relic_dict: dict, is_multiplayer: bool):
+def _read_file(file_path, card_dict: dict, relic_dict: dict, is_multiplayer: bool, player_id=PLAYER_ID):
     """
     Core file reading logic shared by both singleplayer and multiplayer.
     Callers pass in the appropriate card_dict, relic_dict and the expected is_multiplayer flag.
@@ -249,7 +249,7 @@ def _read_file(file_path, card_dict: dict, relic_dict: dict, is_multiplayer: boo
             for point in act:
                 if is_multiplayer:
                     my_stats = next(
-                        (p for p in point.get('player_stats', []) if p.get('player_id') == PLAYER_ID),
+                        (p for p in point.get('player_stats', []) if p.get('player_id') == int(player_id)),
                         None
                     )
                     if my_stats is None:
@@ -278,18 +278,19 @@ def _read_file(file_path, card_dict: dict, relic_dict: dict, is_multiplayer: boo
             parse_relic_info.record_relic_wins(player_data, relic_dict, file_path, is_multiplayer)
 
     except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
-        print(f"Error processing {os.path.basename(file_path)}: {e}")
+        print(f"Error processing {os.path.basename(file_path)}: {e} on line {e.__traceback__.tb_lineno} in {os.path.basename(__file__)}")
 
 
 def read_file_single_player(file_path):
     _read_file(file_path, cards, parse_relic_info.relics, is_multiplayer=False)
 
 
-def read_file_multiplayer(file_path):
-    _read_file(file_path, mp_cards, parse_relic_info.mp_relics, is_multiplayer=True)
+def read_file_multiplayer(file_path, player_id):
+    is_multiplayer = True
+    _read_file(file_path, mp_cards, parse_relic_info.mp_relics, is_multiplayer, player_id)
 
 
-def read_all_files_in_folder(folder_path):
+def read_all_files_in_folder(folder_path, player_id):
     if not os.path.exists(folder_path):
         print(f"Folder not found: {folder_path}")
         return
@@ -298,7 +299,7 @@ def read_all_files_in_folder(folder_path):
         if file_name.endswith('.run'):
             full_path = os.path.join(folder_path, file_name)
             read_file_single_player(full_path)
-            read_file_multiplayer(full_path)
+            read_file_multiplayer(full_path, player_id)
 
 
 if __name__ == "__main__":
