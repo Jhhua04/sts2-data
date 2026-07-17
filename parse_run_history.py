@@ -87,7 +87,6 @@ def read_file(file_path: str, player_id=PLAYER_ID):
     players = data.get("players", [{}])
 
     if is_multiplayer:
-        # find our player entry
         my_player = next(
             (p for p in players if p.get("id") == int(player_id)), None
         )

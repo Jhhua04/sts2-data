@@ -6,8 +6,12 @@ import parse_card_info
 import parse_enemy_info
 import parse_relic_info
 import parse_run_history
+import json
 from wiki_urls import wiki_image_url
-from html_builders import build_enemy_grid_html, build_relic_grid_html, clean_enemy_name, clean_encounter_name
+from html_builders import (build_enemy_grid_html,
+                           build_relic_grid_html,
+                           clean_enemy_name,
+                           clean_encounter_name)
 from ui_styles import SHARED_CSS, TOOLTIP_JS
 import tempfile
 from config import SAVE_FILE_PATH, PLAYER_ID
@@ -15,17 +19,43 @@ from config import SAVE_FILE_PATH, PLAYER_ID
 st.set_page_config(page_title="StS2 Run Analytics", layout="wide")
 st.title("🃏 Slay the Spire 2: Run Analytics Dashboard")
 
-# ── Top-level page toggle ─────────────────────────────────────────────────────
+# ── Top-level page toggle ───────────────────────────────────────────────────
 data_source = st.sidebar.radio(
     "Data Source",
     ["Demo Data", "Upload Run Files", "Local Path (Dev)"],
     index=0
 )
 
+def detect_player_ids(folder_path: str) -> set:
+    all_player_ids = set()
+    if not os.path.exists(folder_path):
+        print(f"Folder not found: {folder_path}")
+        return all_player_ids
+
+    for file_name in os.listdir(folder_path):
+        if not file_name.endswith(".run"):
+            continue
+        file_path = os.path.join(folder_path, file_name)
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                data = json.load(file)
+            players = data.get("players", [{}])
+            for p in players:
+                pid = p.get("id")
+                if pid is not None:
+                    all_player_ids.add(pid)
+        except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
+            print(
+                f"Error processing {os.path.basename(file_path)}: {e} "
+                f"on line {e.__traceback__.tb_lineno} in {os.path.basename(__file__)}"
+            )
+    return all_player_ids
+
 # Initialize a variable to hold the directory we want to parse
 target_folder = None
 uploaded_files = None
 save_file_path = SAVE_FILE_PATH
+all_player_ids = set()
 
 if data_source == "Demo Data":
     target_folder = "example_runs"
@@ -42,7 +72,7 @@ elif data_source == "Upload Run Files":
         help="Navigate to your AppData/SlaytheSpire2 history folder and upload the RUN files."
     )
     player_id = st.sidebar.text_input("Input your player ID", "", key="input_id")
-    if uploaded_files and player_id:
+    if uploaded_files:
         temp_dir = tempfile.TemporaryDirectory()
         target_folder = temp_dir.name
         for uploaded_file in uploaded_files:
@@ -53,8 +83,18 @@ elif data_source == "Upload Run Files":
             file_path = os.path.join(target_folder, safe_name)
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-    elif uploaded_files and not player_id:
-        st.sidebar.warning("⚠️ Please enter your player ID to process uploaded files.")
+        all_player_ids = detect_player_ids(target_folder)
+        if len(all_player_ids) == 1:
+                # If there's only one player_id then there are only singplayer runs
+                player_id = 1
+        if not player_id:
+            if len(all_player_ids) == 0:
+                st.sidebar.info("No player IDs could be detected in the uploaded files.")
+            st.sidebar.warning("⚠️ Please enter your player ID above to process uploaded files.")
+            st.sidebar.info(
+                f"Detected Player IDs: {', '.join(str(pid) for pid in sorted(all_player_ids))}"
+            )            
+            st.stop()
     else:
         st.info("📤 Upload one or more RUN files in the sidebar to view your custom dashboard.")
 
@@ -117,7 +157,6 @@ def load_all_run_data(folder_path):
     parse_run_history.solo_runs.clear()
     parse_run_history.mp_runs.clear()
 
-    # Initialize dictionaries locally
     parse_card_info.read_all_files_in_folder(folder_path, player_id)
     parse_enemy_info.read_all_files_in_folder(folder_path, player_id)
     parse_run_history.read_all_files_in_folder(folder_path, player_id)
