@@ -36,7 +36,6 @@ def wiki_enemy_image_url(enemy_name: str) -> str:
     image_url = _MONSTER_BY_ID.get(enemy_name.upper(), {}).get("image_url")
     return f"https://spire-codex.com{image_url}"
 
-
 def wiki_relic_image_url(relic_name: str) -> str:
     name_slug = relic_name.replace(" ", "")
     if name_slug in odd_relic_names:
