@@ -42,6 +42,8 @@ def process_encounter(point, encounter_dict, monster_dict, is_multiplayer, categ
         encounter_to_monster[encounter_type] = []
         for monster in monsters:
             monster = monster.split('.')[-1]
+            if monster == "OSTY":
+                continue
             encounter_to_monster[encounter_type].append(monster)
     if encounter_type not in encounter_dict:
         encounter_dict[encounter_type] = []
