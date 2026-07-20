@@ -6,7 +6,7 @@ import requests
 API_URL = "https://beta.spire-codex.com/api/"
 ONE_WEEK_IN_SECONDS = 7 * 24 * 60 * 60
 
-def get_json(filename, api_endpoint):
+def get_json(filename, api_endpoint, keys_to_keep=None):
     url = API_URL + api_endpoint
     needs_update = True
     if os.path.exists(filename):
@@ -31,4 +31,11 @@ def get_json(filename, api_endpoint):
                 raise
 
     with open(filename, "r", encoding='utf-8') as f:
-        return json.load(f)
+        data = json.load(f)
+    
+    if keys_to_keep:
+        if isinstance(data, list):
+            return [{k: v for k, v in entry.items() if k in keys_to_keep} for entry in data]
+        elif isinstance(data, dict):
+            return {k: v for k, v in data.items() if k in keys_to_keep}
+    return data

@@ -18,7 +18,7 @@ total_mp_runs = 0
 
 # --- Load cards.json ONCE at module load time ---
 with open("cards.json") as f:
-    _cards_json = get_json.get_json("cards.json", "cards")
+    _cards_json = get_json.get_json("cards.json", "cards", ["id", "name", "description", "color", "cost", "is_x_cost", "type", "rarity"])
 
 _CARD_BY_ID = {r["id"]: r for r in _cards_json}
 _SKIP_RARITIES = {"Basic", "Curse", "Quest"}

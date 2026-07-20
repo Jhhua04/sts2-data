@@ -1,4 +1,9 @@
 import re
+import get_json
+
+with open("cards.json") as f:
+    _monster_json = get_json.get_json("monsters.json", "monsters", ["id", "name", "type", "image_url"])
+_MONSTER_BY_ID = {r["id"]: r for r in _monster_json}
 
 # ── Card name fixes ───────────────────────────────────────────────────────────
 odd_relic_names = {"MeatOnTheBone" : "MeatontheBone", "SelfFormingClay": "Self-FormingClay", "SlingOfCourage" : "SlingofCourage", "TriBoomerang" : "Tri-Boomerang", 
@@ -26,20 +31,10 @@ def wiki_image_url(card_name: str, character: str, upgraded: bool, beta: bool) -
 
 
 def wiki_enemy_image_url(enemy_name: str) -> str:
-    name_slug = enemy_name.replace(" ", "")
-    if name_slug == "Flail_Knight":
-        name_slug = "Mysterious_Knight"
-    elif name_slug == "Scroll_Of_Biting":
-        name_slug = "Scroll_of_Biting"
-    elif name_slug == "Two_Tailed_Rat":
-        name_slug = "Two-Tailed_Rat"
-    elif "Ruby_Raider" in name_slug:
-        name_slug = name_slug.replace("Ruby_", "")
-    elif "Bowlbug" in name_slug:
-        name_slug = f"{name_slug.split('_')[0]}_({name_slug.split('_')[1]})"
-    elif "Leaf_Slime" in name_slug or "Twig_Slime" in name_slug:
-        name_slug = f"{name_slug.split('_')[0]}_{name_slug.split('_')[1]}_({name_slug.split('_')[2]})"
-    return f"https://slaythespire.wiki.gg/images/StS2_{name_slug}.png"
+    if enemy_name == "Doormaker":
+        return "https://slaythespire.wiki.gg/images/StS2_Doormaker-Scrutiny.webp?a9d24a=&format=original"
+    image_url = _MONSTER_BY_ID.get(enemy_name.upper(), {}).get("image_url")
+    return f"https://spire-codex.com{image_url}"
 
 
 def wiki_relic_image_url(relic_name: str) -> str:

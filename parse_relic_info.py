@@ -7,7 +7,7 @@ mp_relics = {}
 
 # --- Load relics.json ONCE at module load time ---
 # --- Load cards.json ONCE at module load time ---
-_relics_json = get_json.get_json("relics.json", "relics")
+_relics_json = get_json.get_json("relics.json", "relics", ["id", "name", "description"])
 
 _RELIC_BY_ID = {r["id"]: r for r in _relics_json}
 

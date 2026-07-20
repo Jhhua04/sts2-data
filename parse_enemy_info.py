@@ -1,6 +1,7 @@
 import json
 import os
 from config import PLAYER_ID, SAVE_FILE_PATH
+import get_json
 
 save_file_path = SAVE_FILE_PATH
 test_file_path = os.path.join(SAVE_FILE_PATH, '1783906905.run') if SAVE_FILE_PATH else ''
@@ -16,6 +17,11 @@ encounter_dict_mp = {}
 monster_dict_mp = {}
 encounter_killed_mp = {}
 
+
+with open("cards.json") as f:
+    _monster_json = get_json.get_json("monsters.json", "monsters", ["id", "name", "type", "image_url"])
+_MONSTER_BY_ID = {r["id"]: r for r in _monster_json}
+
 def get_averages(dict):
     for key in dict:
         avg = sum(dict[key]) / len(dict[key])
@@ -27,8 +33,6 @@ def process_encounter(point, encounter_dict, monster_dict, is_multiplayer, categ
     monsters = rooms[0].get("monster_ids")
     if monsters[0] == "MONSTER.DOOR":
         monsters[0] = "MONSTER.DOORMAKER"
-    elif encounter_type == "ENCOUNTER.DECIMILLIPEDE_ELITE":
-        monsters = ["MONSTER.DECIMILLIPEDE", "MONSTER.DECIMILLIPEDE", "MONSTER.DECIMILLIPEDE"]
     if is_multiplayer:
         my_stats = next(
                         (p for p in point.get('player_stats', []) if p.get('player_id') == int(player_id)),
