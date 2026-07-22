@@ -1,9 +1,5 @@
-import json
 import re
 import get_json
-
-relics = {}
-mp_relics = {}
 
 # --- Load relics.json ONCE at module load time ---
 # --- Load cards.json ONCE at module load time ---
@@ -12,6 +8,9 @@ _relics_json = get_json.get_json("relics.json", "relics", ["id", "name", "descri
 _RELIC_BY_ID = {r["id"]: r for r in _relics_json}
 
 _SEAGLASS_IDS = {"RELIC.SILENT", "RELIC.NECROBINDER", "RELIC.IRONCLAD", "RELIC.REGENT", "RELIC.DEFECT"}
+
+relics = {}
+mp_relics = {}
 
 # Cache cleaned descriptions to avoid repeated regex on the same relic
 _description_cache: dict[str, str] = {}
@@ -31,7 +30,10 @@ class Relic:
         self.name = name
         self.times_taken = 0
         self.times_won = 0
-        self.description = get_relic_descriptions(name.upper().replace(" ", "_")) if name != "Seaglass" else "SEA_GLASS"
+        self.description = (
+            get_relic_descriptions("SEA_GLASS") if name == "Seaglass"
+            else get_relic_descriptions(name.upper().replace(" ", "_"))
+        )
 
     def get_data(self):
         win_rate = (self.times_won / self.times_taken * 100) if self.times_taken > 0 else 0
@@ -77,12 +79,13 @@ def handle_ancient_relic_choices(point, relic_dict: dict):
             r.times_taken += 1
 
 
-def record_relic_wins(player_data, relic_dict: dict, file_path, is_mp):
+def record_relic_wins(player_data, relic_dict: dict):
     """Mark every relic the player held at run end as a win."""
     for r in player_data[0].get('relics', []):
         relic_id = r.get('id')
+        relic_obj =_ensure_relic(relic_id, relic_dict)
         if relic_id:
-            _ensure_relic(relic_id, relic_dict).times_won += 1
+            relic_obj.times_won += 1
 
 
 def _clean_name(internal_id: str) -> str:

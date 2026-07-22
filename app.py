@@ -1,17 +1,19 @@
-import html
 import streamlit as st
 import pandas as pd
 import os
-import parse_card_info
-import parse_enemy_info
-import parse_relic_info
-import parse_run_history
-import json
-from wiki_urls import wiki_image_url
-from html_builders import (build_enemy_grid_html,
+import data_load
+import constants
+import render
+import streamlit_widgets
+
+from html_builders import (build_card_grid_html,
+                           build_enemy_grid_html,
                            build_relic_grid_html,
+                           build_run_history_table_html,
                            clean_enemy_name,
-                           clean_encounter_name)
+                           clean_encounter_name,
+                           DECK_CSS,
+                           DECK_JS)
 from ui_styles import SHARED_CSS, TOOLTIP_JS
 import tempfile
 from config import SAVE_FILE_PATH, PLAYER_ID
@@ -25,31 +27,6 @@ data_source = st.sidebar.radio(
     ["Demo Data", "Upload Run Files", "Local Path (Dev)"],
     index=0
 )
-
-def detect_player_ids(folder_path: str) -> set:
-    all_player_ids = set()
-    if not os.path.exists(folder_path):
-        print(f"Folder not found: {folder_path}")
-        return all_player_ids
-
-    for file_name in os.listdir(folder_path):
-        if not file_name.endswith(".run"):
-            continue
-        file_path = os.path.join(folder_path, file_name)
-        try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
-            players = data.get("players", [{}])
-            for p in players:
-                pid = p.get("id")
-                if pid is not None:
-                    all_player_ids.add(pid)
-        except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
-            print(
-                f"Error processing {os.path.basename(file_path)}: {e} "
-                f"on line {e.__traceback__.tb_lineno} in {os.path.basename(__file__)}"
-            )
-    return all_player_ids
 
 # Initialize a variable to hold the directory we want to parse
 target_folder = None
@@ -71,7 +48,11 @@ elif data_source == "Upload Run Files":
         accept_multiple_files=True,
         help="Navigate to your AppData/SlaytheSpire2 history folder and upload the RUN files."
     )
-    player_id = st.sidebar.text_input("Input your player ID", "", key="input_id")
+    player_id_col, clear_id_col = st.sidebar.columns([3, 1], vertical_alignment="bottom")
+    with player_id_col:
+        player_id = st.text_input("Input your player ID", key="input_id")
+    with clear_id_col:
+        st.button("Clear", on_click=streamlit_widgets.clear_id, key="clear_btn", use_container_width=True)
     if uploaded_files:
         temp_dir = tempfile.TemporaryDirectory()
         target_folder = temp_dir.name
@@ -83,7 +64,7 @@ elif data_source == "Upload Run Files":
             file_path = os.path.join(target_folder, safe_name)
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-        all_player_ids = detect_player_ids(target_folder)
+        all_player_ids = data_load.detect_player_ids(target_folder)
         if len(all_player_ids) == 1:
                 # If there's only one player_id then there are only singplayer runs
                 player_id = 1
@@ -91,9 +72,11 @@ elif data_source == "Upload Run Files":
             if len(all_player_ids) == 0:
                 st.sidebar.info("No player IDs could be detected in the uploaded files.")
             st.sidebar.warning("⚠️ Please enter your player ID above to process uploaded files.")
-            st.sidebar.info(
-                f"Detected Player IDs: {', '.join(str(pid) for pid in sorted(all_player_ids))}"
-            )            
+            options = [str(pid) for pid in sorted(all_player_ids)]
+            player_id = st.sidebar.pills("Detected Player IDs", 
+                                         options, default=None, 
+                                         key="detected_ids",
+                                         on_change=streamlit_widgets.update_player_id)            
             st.stop()
     else:
         st.info("📤 Upload one or more RUN files in the sidebar to view your custom dashboard.")
@@ -114,89 +97,18 @@ page = st.sidebar.radio("View", ["Cards", "Enemies", "Relics", "Run History"], h
 def update_card_mode(key: str, new_mode: str):
     st.session_state[key] = new_mode
 
-def sp_mp_toggle(key: str) -> str:
-    col_sp, col_mp = st.columns(2)
-    mode = st.session_state.get(key, "SP")
-    with col_sp:
-        st.button(
-            "⚔️ Singleplayer", 
-            use_container_width=True,
-            type="primary" if mode == "SP" else "secondary",
-            on_click=update_card_mode,
-            args=(key, "SP")
-        )
-    with col_mp:
-        st.button(
-            "👥 Multiplayer", 
-            use_container_width=True,
-            type="primary" if mode == "MP" else "secondary",
-            on_click=update_card_mode,
-            args=(key, "MP")
-        )
-    return st.session_state.get(key, "SP")
-
-@st.cache_data
-def load_all_run_data(folder_path):
-    parse_card_info.cards = {}
-    parse_card_info.mp_cards = {}
-    parse_relic_info.relics = {}
-    parse_relic_info.mp_relics = {}
-    parse_card_info.total_solo_runs = 0
-    parse_card_info.total_mp_runs = 0
-
-    parse_enemy_info.encounter_dict = {}
-    parse_enemy_info.monster_dict = {}
-    parse_enemy_info.encounter_to_monster = {}
-    parse_enemy_info.encounter_dict_mp = {}
-    parse_enemy_info.monster_dict_mp = {}
-    parse_enemy_info.encounter_killed_mp = {}
-    parse_enemy_info.encounter_category = {}
-    parse_enemy_info.monster_category = {}
-    parse_enemy_info.encounter_killed = {}
-
-    parse_run_history.solo_runs.clear()
-    parse_run_history.mp_runs.clear()
-
-    parse_card_info.read_all_files_in_folder(folder_path, player_id)
-    parse_enemy_info.read_all_files_in_folder(folder_path, player_id)
-    parse_run_history.read_all_files_in_folder(folder_path, player_id)
-    
-    return (
-        dict(parse_card_info.cards),
-        dict(parse_card_info.mp_cards),
-        dict(parse_relic_info.relics),
-        dict(parse_relic_info.mp_relics),
-        parse_card_info.total_solo_runs,
-        parse_card_info.total_mp_runs,
-        dict(parse_enemy_info.encounter_dict),
-        dict(parse_enemy_info.monster_dict),
-        dict(parse_enemy_info.encounter_to_monster),
-        dict(parse_enemy_info.encounter_dict_mp),
-        dict(parse_enemy_info.monster_dict_mp),
-        dict(parse_enemy_info.encounter_killed_mp),
-        dict(parse_enemy_info.encounter_category),
-        dict(parse_enemy_info.monster_category),
-        dict(parse_enemy_info.encounter_killed),
-        list(parse_run_history.solo_runs),
-        list(parse_run_history.mp_runs),
-    )
 if target_folder and os.path.exists(target_folder):
     
     with st.spinner("Parsing run files..."):
         cards_data, mp_cards_data, relics_data, mp_relics_data, total_runs, total_mp_runs, enc_dict_sp, mon_dict_sp, \
         enc_to_mon,enc_dict_mp,mon_dict_mp,enc_kill_mp,enc_cat,mon_cat,enc_kill_sp, \
-        solo_run_history, mp_run_history = load_all_run_data(target_folder)
+        solo_run_history, mp_run_history = data_load.load_all_run_data(target_folder, player_id)
     
-    CUSTOM_SORT_ORDERS = {
-    "Card Class": ["Colorless", "Defect", "Necrobinder", "Regent", "Silent", "Ironclad"],
-    "Rarity": ["Event", "Ancient", "Rare", "Uncommon", "Common"],
-    "Type": ["Power", "Skill", "Attack"],
-    "Cost": ["X", "3", "2", "1", "0"],
-    }
+    CUSTOM_SORT_ORDERS = constants.CUSTOM_SORT_ORDERS
 
     # ── CARDS PAGE ────────────────────────────────────────────────────────────
     if page == "Cards":
-        sp_mp_toggle("card_mode")
+        render.sp_mp_toggle("card_mode")
 
         card_mode = st.session_state.get("card_mode", "SP")
         active_cards_data = cards_data if card_mode == "SP" else mp_cards_data
@@ -210,13 +122,13 @@ if target_folder and os.path.exists(target_folder):
             st.sidebar.subheader("Filters")
             search = st.sidebar.text_input("Search card name", "", key="search")
             
-            all_chars = ["Ironclad", "Silent", "Regent", "Necrobinder", "Defect", "Colorless"]
+            all_chars = constants.ALL_CHARACTERS
             selected_chars = st.sidebar.pills("Character", all_chars, default=None, key="char")
-            all_rarity = ["Common", "Uncommon", "Rare", "Ancient", "Event"]
+            all_rarity = constants.ALL_RARITIES
             selected_rarity = st.sidebar.pills("Rarity", all_rarity, default=None, key="rarity")
-            all_types = ["Attack", "Skill", "Power"]
+            all_types = constants.ALL_TYPES
             selected_types = st.sidebar.pills("Types", all_types, default=None, key ="type")
-            all_costs = ["0", "1", "2", "3", "X"]
+            all_costs = constants.ALL_COSTS
             selected_costs = st.sidebar.pills("Cost (Unupgraded)", all_costs, default=None, key="cost")
             sort_by = st.sidebar.selectbox(
                 "Sort by", ["Win Rate (%)", "Pick Rate (%)", "Picked", "Offered", "Wins", "Card Name", "Card Class", "Rarity", "Type", "Cost"],
@@ -253,87 +165,8 @@ if target_folder and os.path.exists(target_folder):
             filtered = filtered.sort_values(by=sort_by, ascending=sort_asc)
             st.markdown("---")
 
-            cards_html_parts = []
-            for row in filtered.itertuples():
-                raw_name = row._1
-                raw_character = row._2
-                raw_type = row.Type
-                name = html.escape(str(raw_name))
-                character = html.escape(str(raw_character))
-                rarity = row.Rarity
-                card_type = html.escape(str(raw_type))
-                cost = row.Cost
-                offered = int(row.Offered)
-                picked = int(row.Picked)
-                wins = int(row.Wins)
-                pick_rate = float(row._12)
-                win_rate = float(row._13)
-
-                # Raw (unescaped) values are used for URL building and dict
-                # lookups so HTML-escaping doesn't corrupt slugs or miss
-                # known-value matches; escaped versions are display-only.
-                img_url = wiki_image_url(raw_name, raw_character, upgraded, beta)
-                initials = "".join(w[0] for w in raw_name.split()[:2]).upper()
-
-                if win_rate >= 50:
-                    wr_colour = "#2ecc71"
-                elif win_rate >= 25:
-                    wr_colour = "#f0a500"
-                else:
-                    wr_colour = "#e74c3c"
-
-                pr_bar = min(pick_rate, 100)
-                wr_bar = min(win_rate, 100)
-
-                char_colors = {
-                    "Ironclad": "#D62000", "Silent": "#5EBD00", "Defect": "#3EB3ED",
-                    "Regent": "#E36600", "Necrobinder": "#CD4EED", "Colorless": "#A3A3A3",
-                }
-                type_colors = {
-                    "Attack": "#ff8172", "Skill": "#70fa70", "Power": "#798dff",}
-
-                badge_color = char_colors.get(raw_character, "#555")
-                type_color = type_colors.get(raw_type, "#555")
-                tooltip_html = (
-                    f'<div class="tt-title">{name}</div>'
-                    f'<div class="tt-char" style="color:{badge_color}">{character}</div>'
-                    f'<table class="tt-table">'
-                    f'<tr><td>Offered</td><td>{offered}</td></tr>'
-                    f'<tr><td>Picked</td><td>{picked}</td></tr>'
-                    f'<tr><td>Wins with card</td><td>{wins}</td></tr>'
-                    f'<tr><td>Pick rate</td><td>{pick_rate:.1f}%</td></tr>'
-                    f'<tr><td>Win rate</td><td style="color:{wr_colour};font-weight:600">{win_rate:.1f}%</td></tr>'
-                    f'</table>'
-                ).replace('"', '&quot;')
-
-                cards_html_parts.append(
-                    f'<div class="card-tile" data-tooltip="{tooltip_html}" data-badge="{badge_color}">'
-                    f'  <div class="card-img-wrap">'
-                    f'    <img src="{img_url}" class="card-art" alt="{name}"'
-                    f'      onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
-                    f'    <div class="card-art-placeholder" style="display:none">{initials}</div>'
-                    f'  </div>'
-                    f'  <div class="card-body">'
-                    f'    <div class="card-name">{name}</div>'
-                    f'    <div class="char-badge" style="background:{badge_color}22;color:{badge_color};'
-                    f'border:1px solid {badge_color}55">{character}</div>'
-                    f'    <div class="char-badge" style="background:{type_color}22;color:{type_color};'
-                    f'border:1px solid {type_color}55">{card_type}</div>'
-                    f'    <div class="stat-row">'
-                    f'      <span class="stat-label">Pick</span>'
-                    f'      <div class="bar-wrap"><div class="bar-fill bar-blue" style="width:{pr_bar}%"></div></div>'
-                    f'      <span class="stat-val">{pick_rate:.1f}%</span>'
-                    f'    </div>'
-                    f'    <div class="stat-row">'
-                    f'      <span class="stat-label">Win</span>'
-                    f'      <div class="bar-wrap"><div class="bar-fill" style="width:{wr_bar}%;background:{wr_colour}"></div></div>'
-                    f'      <span class="stat-val" style="color:{wr_colour}">{win_rate:.1f}%</span>'
-                    f'    </div>'
-                    f'  </div>'
-                    f'</div>'
-                )
-
-            cards_html = "\n".join(cards_html_parts)
+            card_rows = filtered.to_dict("records")
+            cards_html = build_card_grid_html(card_rows, upgraded, beta)
             num_cards = len(filtered)
 
             with metrics_placeholder.container():
@@ -357,7 +190,7 @@ if target_folder and os.path.exists(target_folder):
 
     # ── ENEMIES PAGE ──────────────────────────────────────────────────────────
     elif page == "Enemies":
-        sp_mp_toggle("mode")
+        render.sp_mp_toggle("mode")
 
         mode = st.session_state.get("mode", "SP")
         enc_dict = enc_dict_sp if mode == "SP" else enc_dict_mp
@@ -415,12 +248,7 @@ if target_folder and os.path.exists(target_folder):
 
             st.markdown("---")
 
-            CATEGORY_ORDER = [
-                ("boss",   "👑 Bosses"),
-                ("elite",  "⚔️ Elites"),
-                ("normal", "🗡️ Enemies"),
-                ("weak",   "🗡️ Enemies"),
-            ]
+            CATEGORY_ORDER = constants.CATEGORY_ORDER
 
             all_html_parts = []
             seen_enemy_header = False
@@ -463,8 +291,7 @@ if target_folder and os.path.exists(target_folder):
 
     # ── RELICS PAGE ───────────────────────────────────────────────────────────
     elif page == "Relics":
-
-        sp_mp_toggle("relic_mode")
+        render.sp_mp_toggle("relic_mode")
 
         relic_mode = st.session_state.get("relic_mode", "SP")
         active_relics_data = relics_data if relic_mode == "SP" else mp_relics_data
@@ -480,8 +307,8 @@ if target_folder and os.path.exists(target_folder):
             min_picked = st.sidebar.slider("Min times picked", 0, max_picked, 0)
 
             # ── Sort priority builder ─────────────────────────────────────────
-            SORT_COLS = ["Win Rate (%)", "Taken", "Wins", "Relic Name"]
-            SORT_DEFAULTS = {"Win Rate (%)": "desc", "Taken": "desc", "Wins": "desc", "Relic Name": "asc"}
+            SORT_COLS = constants.RELIC_SORT_COLS
+            SORT_DEFAULTS = constants.RELIC_SORT_DEFAULTS
 
             st.sidebar.markdown("**Sort priority**")
             st.sidebar.caption("Reorder columns; toggle ↑ ↓ per column.")
@@ -546,9 +373,7 @@ if target_folder and os.path.exists(target_folder):
 
     # ── RUN HISTORY PAGE ──────────────────────────────────────────────────────
     elif page == "Run History":
-        import datetime
-
-        sp_mp_toggle("history_mode")
+        render.sp_mp_toggle("history_mode")
         history_mode = st.session_state.get("history_mode", "SP")
         active_runs = solo_run_history if history_mode == "SP" else mp_run_history
 
@@ -608,250 +433,8 @@ if target_folder and os.path.exists(target_folder):
             st.markdown("---")
 
             # ── Build the run history HTML table ──────────────────────────────
-            CHAR_COLORS = {
-                "Ironclad": "#D62000", "Silent": "#5EBD00", "Defect": "#3EB3ED",
-                "Regent": "#E36600", "Necrobinder": "#CD4EED", "Colorless": "#A3A3A3",
-            }
+            table_html = build_run_history_table_html(filtered)
 
-            def _asc_badge(asc: int) -> str:
-                if asc == 0:
-                    color = "#22f379"
-                if asc >= 10:
-                    color = "#c678dd"
-                elif asc >= 6:
-                    color = "#e74c3c"
-                elif asc >= 3:
-                    color = "#f0a500"
-                else:
-                    color = "#5b8dee"
-                return (
-                    f'<span style="background:{color}22;color:{color};border:1px solid {color}55;'
-                    f'border-radius:4px;padding:2px 8px;font-size:13px;font-weight:600">A{asc}</span>'
-                )
-
-            rows_html = []
-            for i, r in enumerate(filtered):
-                dt = datetime.datetime.fromtimestamp(r["timestamp"]).strftime("%Y-%m-%d %H:%M")
-                win_label = "✅ Win" if r["win"] else "💀 Loss"
-                win_color = "#2ecc71" if r["win"] else "#e74c3c"
-                # Raw values used for lookups/URLs; escaped versions for display text.
-                raw_char = r.get("character", "")
-                char_display = html.escape(str(raw_char))
-                killed_by_display = html.escape(str(r["killed_by"])) if r["killed_by"] else ""
-                char_color = CHAR_COLORS.get(raw_char, "#aaa")
-                killed_cell = (
-                    f'<span style="color:#e74c3c;font-size:12px">{killed_by_display}</span>'
-                    if killed_by_display else
-                    '<span style="color:#444">—</span>'
-                )
-                row_bg = "#1a1a2e" if i % 2 == 0 else "#16162a"
-                deck_cards = r.get("deck") or []
-                deck_items_html = "".join(
-                    (lambda n=name: (
-                        f'<div class="deck-card"'
-                        f' data-img="{wiki_image_url(n.rstrip("+"), raw_char, n.endswith("+"), False)}"'
-                        f'>{html.escape(n)}</div>'
-                    ))()
-                    for name in deck_cards if name
-                )
-                rows_html.append(
-                    f'<tr style="background:{row_bg}">'
-                    f'  <td style="padding:8px 12px;color:#888;font-size:13px">{dt}</td>'
-                    f'  <td style="padding:8px 12px;font-weight:600;color:{win_color}">{win_label}</td>'
-                    f'  <td style="padding:8px 12px">'
-                    f'    <span style="background:{char_color}22;color:{char_color};border:1px solid {char_color}55;'
-                    f'border-radius:4px;padding:2px 8px;font-size:13px;font-weight:600">{char_display}</span>'
-                    f'  </td>'
-                    f'  <td style="padding:8px 12px;text-align:center">{_asc_badge(r["ascension"])}</td>'
-                    f'  <td style="padding:8px 12px;text-align:center">'
-                    f'    <span class="deck-wrap">'
-                    f'      <span class="deck-trigger">{r["deck_size"]}</span>'
-                    f'      <div class="deck-popup"><div class="deck-grid">{deck_items_html}</div></div>'
-                    f'    </span>'
-                    f'  </td>'
-                    f'  <td style="padding:8px 12px;text-align:center;color:#ddd">{r["floor"]}</td>'
-                    f'  <td style="padding:8px 12px">{killed_cell}</td>'
-                    f'</tr>'
-                )
-
-            table_html = (
-                '<table style="width:100%;border-collapse:collapse;font-family:sans-serif">'
-                '<thead>'
-                '<tr style="background:#12121f;border-bottom:2px solid #333355">'
-                '  <th style="padding:10px 12px;text-align:left;color:#8888aa;font-size:13px;font-weight:600">Date</th>'
-                '  <th style="padding:10px 12px;text-align:left;color:#8888aa;font-size:13px;font-weight:600">Outcome</th>'
-                '  <th style="padding:10px 12px;text-align:left;color:#8888aa;font-size:13px;font-weight:600">Character</th>'
-                '  <th style="padding:10px 12px;text-align:center;color:#8888aa;font-size:13px;font-weight:600">Ascension</th>'
-                '  <th style="padding:10px 12px;text-align:center;color:#8888aa;font-size:13px;font-weight:600">Deck Size</th>'
-                '  <th style="padding:10px 12px;text-align:center;color:#8888aa;font-size:13px;font-weight:600">Floors</th>'
-                '  <th style="padding:10px 12px;text-align:left;color:#8888aa;font-size:13px;font-weight:600">Killed By</th>'
-                '</tr>'
-                '</thead>'
-                '<tbody>'
-                + "\n".join(rows_html) +
-                '</tbody>'
-                '</table>'
-            )
-
-            DECK_CSS = """
-.deck-wrap { position: relative; display: inline-block; }
-.deck-trigger {
-    color: #f0a500; font-weight: 600;
-    border-bottom: 1px dotted #f0a500; cursor: default;
-}
-.deck-popup {
-    display: none; position: fixed;
-    background: #12121f; border: 1px solid #333355;
-    border-radius: 8px; padding: 10px 12px;
-    z-index: 9999; min-width: 260px; max-width: 420px;
-    box-shadow: 0 8px 32px #00000088;
-    pointer-events: auto;
-}
-.deck-wrap:hover .deck-popup { display: block; }
-/* also kept open by JS when mouse is inside popup */
-.deck-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 5px;
-}
-.deck-card {
-    position: relative;
-    background: #1a1a2e; border: 1px solid #2a2a4a;
-    border-radius: 4px; padding: 3px 7px;
-    font-size: 12px; color: #ccc; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis;
-    cursor: default;
-    transition: border-color 0.15s, background 0.15s;
-}
-.deck-card:hover {
-    border-color: #5b8dee;
-    background: #1e1e3a;
-    z-index: 2;
-}
-/* floating card image shown on individual card hover */
-.deck-card-preview {
-    display: none;
-    position: fixed;
-    z-index: 99999;
-    pointer-events: none;
-    border-radius: 8px;
-    box-shadow: 0 8px 32px #000000cc;
-    width: 180px;
-    background: #1a1a2e;
-    border: 1px solid #333355;
-    overflow: hidden;
-}
-.deck-card-preview.visible { display: block; }
-.deck-card-preview img {
-    width: 100%;
-    display: block;
-    aspect-ratio: 3/4;
-    object-fit: cover;
-}
-.deck-card-preview .preview-name {
-    font-size: 12px; color: #ccc;
-    padding: 4px 8px 6px;
-    text-align: center;
-    background: #12121f;
-    border-top: 1px solid #2a2a4a;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.deck-card-preview .preview-placeholder {
-    width: 100%; aspect-ratio: 3/4;
-    display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #2a2a4a 0%, #3a2060 100%);
-    font-size: 28px; font-weight: 700; color: rgba(255,255,255,0.3);
-}
-"""
-            DECK_JS = """
-(function() {
-    // Position & show deck popup; keep it open while hovering popup itself
-    document.querySelectorAll('.deck-wrap').forEach(function(wrap) {
-        var popup = wrap.querySelector('.deck-popup');
-        var hideTimer = null;
-
-        function showPopup() {
-            clearTimeout(hideTimer);
-            var r = wrap.getBoundingClientRect();
-            var popW = popup.offsetWidth || 260;
-            var left = r.left;
-            if (left + popW > window.innerWidth - 10) {
-                left = window.innerWidth - popW - 10;
-            }
-            popup.style.left = left + 'px';
-            popup.style.top  = (r.bottom + 4) + 'px';
-            popup.style.display = 'block';
-        }
-
-        function scheduleHide() {
-            hideTimer = setTimeout(function() {
-                popup.style.display = 'none';
-                preview.classList.remove('visible');
-            }, 80);
-        }
-
-        wrap.addEventListener('mouseenter', showPopup);
-        wrap.addEventListener('mouseleave', scheduleHide);
-        popup.addEventListener('mouseenter', function() { clearTimeout(hideTimer); });
-        popup.addEventListener('mouseleave', scheduleHide);
-    });
-
-    // Single shared card-image preview element
-    var preview = document.createElement('div');
-    preview.className = 'deck-card-preview';
-    preview.innerHTML = '<img src="" alt=""><div class="preview-name"></div>';
-    document.body.appendChild(preview);
-
-    var previewImg  = preview.querySelector('img');
-    var previewName = preview.querySelector('.preview-name');
-
-    document.querySelectorAll('.deck-card').forEach(function(card) {
-        card.addEventListener('mouseenter', function() {
-            var imgSrc = card.dataset.img || '';
-            var name   = card.textContent.trim();
-
-            previewName.textContent = name;
-            previewImg.style.display = 'block';
-
-            if (imgSrc) {
-                previewImg.src = imgSrc;
-                previewImg.onerror = function() { previewImg.style.display = 'none'; };
-                previewImg.onload  = function() { previewImg.style.display = 'block'; };
-            } else {
-                previewImg.style.display = 'none';
-            }
-
-            preview.classList.add('visible');
-            positionPreview(card);
-        });
-
-        card.addEventListener('mouseleave', function() {
-            preview.classList.remove('visible');
-        });
-    });
-
-    function positionPreview(card) {
-        var rect   = card.getBoundingClientRect();
-        var pw     = preview.offsetWidth  || 180;
-        var ph     = preview.offsetHeight || 240;
-        var vw     = window.innerWidth;
-        var vh     = window.innerHeight;
-        var MARGIN = 8;
-
-        // Prefer right of the deck popup; fall back to left of deck popup
-        var left = rect.right + MARGIN;
-        if (left + pw > vw - MARGIN) left = rect.left - pw - MARGIN;
-        if (left < MARGIN) left = MARGIN;
-
-        // Vertically centre on card; clamp to viewport
-        var top = rect.top + rect.height / 2 - ph / 2;
-        if (top < MARGIN) top = MARGIN;
-        if (top + ph > vh - MARGIN) top = vh - ph - MARGIN;
-
-        preview.style.left = left + 'px';
-        preview.style.top  = top  + 'px';
-    }
-})();
-"""
             component_html = (
                 f"<style>body{{background:#0d0d1a;margin:0;padding:0}}"
                 f"table{{border-radius:8px;overflow:hidden}}"
@@ -884,7 +467,7 @@ if target_folder and os.path.exists(target_folder):
         The developer shall not be held liable for any data loss, game corruption, or unforeseen technical issues arising from the use of this dashboard.
 
         Affiliation & Credits -
-        This is an unofficial, fan-made project. It is not affiliated with, endorsed by, or sponsored by Mega Crit. Slay the Spire 2 and all related game assets are the property of Mega Crit.
+        This is an unofficial, fan-made project. It is not affiliated with, endorsed by, or sponsored by Mega Crit. Slay the Spire 2 and all related game assets are the property of Mega Crit. Images taken from slay the spire wiki and the spire codex.
 
         Built using Python, Streamlit, and Pandas.
 
@@ -896,6 +479,7 @@ if target_folder and os.path.exists(target_folder):
 
     if data_source == "Upload Run Files" and uploaded_files:
             temp_dir.cleanup()  
+    print("-----------------------------------------------------------------")
 elif target_folder and not os.path.exists(target_folder):
     st.error("Folder path not found. Please check the directory.")
 else:

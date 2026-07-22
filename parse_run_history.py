@@ -1,6 +1,5 @@
 import json
 import os
-import re
 from parse_card_info import clean_name
 from config import PLAYER_ID, SAVE_FILE_PATH
 

@@ -275,7 +275,7 @@ def _read_file(file_path, card_dict: dict, relic_dict: dict, is_multiplayer: boo
                     card_obj = _ensure_card(card_id, card_dict)
                     if card_obj:
                         card_obj.times_won += 1
-            parse_relic_info.record_relic_wins(player_data, relic_dict, file_path, is_multiplayer)
+            parse_relic_info.record_relic_wins(player_data, relic_dict)
 
     except (FileNotFoundError, json.JSONDecodeError, Exception) as e:
         print(f"Error processing {os.path.basename(file_path)}: {e} on line {e.__traceback__.tb_lineno} in {os.path.basename(__file__)}")

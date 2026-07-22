@@ -38,6 +38,8 @@ def process_encounter(point, encounter_dict, monster_dict, is_multiplayer, categ
                         (p for p in point.get('player_stats', []) if p.get('player_id') == int(player_id)),
                         None
                     )
+        if my_stats is None:
+            return
         point = {**point, 'player_stats': [my_stats]}
     damage_taken = point.get('player_stats')[0].get("damage_taken")
     
