@@ -10,3 +10,6 @@ def clear_id():
 
 def update_card_mode(key: str, new_mode: str):
     st.session_state[key] = new_mode
+
+def set_active(view_mode: str):
+    st.session_state.run_view_mode = view_mode 

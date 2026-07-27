@@ -1,5 +1,6 @@
 import datetime
 import html
+import json
 import re
 from wiki_urls import wiki_enemy_image_url, wiki_image_url, wiki_relic_image_url
 
@@ -561,3 +562,147 @@ def build_run_history_table_html(filtered) -> str:
         '</table>'
     )
     return table_html
+
+def build_run_history_graph_html(filtered) -> str:
+    """Builds an HTML string containing an interactive Chart.js line/scatter plot
+    of run history, showing floors reached on the Y-axis and run number on the X-axis.
+    
+    `filtered` is a list of run dicts with keys: timestamp, win,
+    character, ascension, deck_size, deck, floor, killed_by.
+    """
+    labels = []
+    floors = []
+    point_colors = []
+    run_details = []
+
+    for i, r in enumerate(filtered):
+        # Run number on X-axis (1-indexed based on current sorted view)
+        labels.append(i + 1)
+        floors.append(r.get("floor", 0))
+        
+        # Determine node color: Green for win, Red for loss
+        win = r.get("win", False)
+        point_colors.append("#2ecc71" if win else "#e74c3c")
+        
+        # Safely escape strings for tooltips
+        char = html.escape(str(r.get("character", "Unknown")))
+        killed_by = html.escape(str(r.get("killed_by", ""))) if not win else ""
+        
+        run_details.append({
+            "character": char,
+            "ascension": r.get("ascension", 0),
+            "win": win,
+            "killed_by": killed_by
+        })
+
+    # Serialize data into JSON strings to inject safely into the JavaScript block
+    labels_json = json.dumps(labels)
+    floors_json = json.dumps(floors)
+    colors_json = json.dumps(point_colors)
+    details_json = json.dumps(run_details)
+
+    html_str = f"""
+    <style>
+        body, html {{ margin: 0; padding: 0; background: #0d0d1a; height: 100%; }}
+        .chart-container {{
+            position: relative;
+            height: 95vh;
+            width: 100%;
+            background: #12121f;
+            border: 1px solid #333355;
+            border-radius: 8px;
+            padding: 15px;
+            box-sizing: border-box;
+        }}
+    </style>
+    
+    <div class="chart-container">
+        <canvas id="runChart"></canvas>
+    </div>
+    
+    <!-- Load Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        const ctx = document.getElementById('runChart').getContext('2d');
+        const labels = {labels_json};
+        const floors = {floors_json};
+        const pointColors = {colors_json};
+        const details = {details_json};
+
+        new Chart(ctx, {{
+            type: 'line',
+            data: {{
+                labels: labels,
+                datasets: [{{
+                    label: 'Floors Reached',
+                    data: floors,
+                    borderColor: 'rgba(91, 141, 238, 0.4)', // Faint blue line connecting runs
+                    backgroundColor: pointColors,
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: '#12121f', // Match background
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {{
+                    y: {{
+                        beginAtZero: true,
+                        title: {{ display: true, text: 'Floor Reached', color: '#8888aa', font: {{size: 14}} }},
+                        ticks: {{ color: '#8888aa' }},
+                        grid: {{ color: '#2a2a4a' }}
+                    }},
+                    x: {{
+                        title: {{ display: true, text: 'Run Number', color: '#8888aa', font: {{size: 14}} }},
+                        ticks: {{ color: '#8888aa' }},
+                        grid: {{ color: '#2a2a4a' }}
+                    }}
+                }},
+                plugins: {{
+                    legend: {{ display: false }},
+                    tooltip: {{
+                        backgroundColor: 'rgba(26, 26, 46, 0.95)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#cccccc',
+                        borderColor: '#333355',
+                        borderWidth: 1,
+                        padding: 12,
+                        titleFont: {{ size: 14 }},
+                        bodyFont: {{ size: 13, lineHeight: 1.5 }},
+                        displayColors: false,
+                        callbacks: {{
+                            title: function(context) {{
+                                return 'Run #' + context[0].label;
+                            }},
+                            label: function(context) {{
+                                const index = context.dataIndex;
+                                const run = details[index];
+                                const lines = [];
+                                
+                                lines.push('Floor: ' + context.parsed.y);
+                                lines.push('Character: ' + run.character + ' (A' + run.ascension + ')');
+                                
+                                if (run.win) {{
+                                    lines.push('Outcome: ✅ Victory');
+                                }} else {{
+                                    lines.push('Outcome: 💀 Defeat');
+                                    if (run.killed_by) {{
+                                        lines.push('Killed by: ' + run.killed_by);
+                                    }}
+                                }}
+                                return lines;
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }});
+    </script>
+    """
+    return html_str

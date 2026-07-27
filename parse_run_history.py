@@ -35,7 +35,7 @@ def _floor_reached(map_data: list) -> int:
     total = 0
     for act in map_data:
         total += len(act)
-    return total
+    return total if total <= 49 else 49
 
 
 def _killed_by(raw: str) -> str:

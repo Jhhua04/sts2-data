@@ -10,6 +10,7 @@ from html_builders import (build_card_grid_html,
                            build_enemy_grid_html,
                            build_relic_grid_html,
                            build_run_history_table_html,
+                           build_run_history_graph_html,
                            clean_enemy_name,
                            clean_encounter_name,
                            DECK_CSS,
@@ -28,7 +29,6 @@ data_source = st.sidebar.radio(
     index=0
 )
 
-# Initialize a variable to hold the directory we want to parse
 target_folder = None
 uploaded_files = None
 save_file_path = SAVE_FILE_PATH
@@ -88,8 +88,6 @@ elif data_source == "Local Path (Dev)":
         value= save_file_path if save_file_path else "",
         key = "local_path"
     )
-
-page = st.sidebar.radio("View", ["Cards", "Enemies", "Relics", "Run History"], horizontal=True)
 # =============================================================================
 # DATA LOADING & RENDERING
 # =============================================================================
@@ -98,6 +96,8 @@ def update_card_mode(key: str, new_mode: str):
     st.session_state[key] = new_mode
 
 if target_folder and os.path.exists(target_folder):
+
+    page = st.sidebar.radio("View", ["Cards", "Enemies", "Relics", "Run History"], horizontal=True)
     
     with st.spinner("Parsing run files..."):
         cards_data, mp_cards_data, relics_data, mp_relics_data, total_runs, total_mp_runs, enc_dict_sp, mon_dict_sp, \
@@ -380,14 +380,12 @@ if target_folder and os.path.exists(target_folder):
         if active_runs:
             st.sidebar.subheader("Filters")
             all_chars = sorted({r["character"] for r in active_runs if r["character"]})
-            selected_char = st.sidebar.selectbox("Character", ["All"] + all_chars)
-
+            selected_char = st.sidebar.pills("Character", all_chars, selection_mode="multi")
             outcome = st.sidebar.radio("Outcome", ["All", "Wins", "Losses"], horizontal=True)
 
             all_ascs = sorted({r["ascension"] for r in active_runs})
-            asc_options = ["All"] + [str(a) for a in all_ascs]
-            selected_asc = st.sidebar.selectbox("Ascension", asc_options)
-
+            asc_options = [str(a) for a in all_ascs]
+            selected_asc = st.sidebar.pills("Ascension", asc_options, selection_mode="multi")
             sort_by = st.sidebar.selectbox(
                 "Sort by", ["Date", "Ascension", "Floor Reached", "Deck Size", "Character"]
             )
@@ -395,14 +393,15 @@ if target_folder and os.path.exists(target_folder):
 
             # ── Apply filters ─────────────────────────────────────────────────
             filtered = active_runs
-            if selected_char != "All":
-                filtered = [r for r in filtered if r["character"] == selected_char]
+            if selected_char != []:
+                filtered = [r for r in filtered if r["character"] in selected_char]
             if outcome == "Wins":
                 filtered = [r for r in filtered if r["win"]]
             elif outcome == "Losses":
                 filtered = [r for r in filtered if not r["win"]]
-            if selected_asc != "All":
-                filtered = [r for r in filtered if r["ascension"] == int(selected_asc)]
+            if selected_asc != []:
+                selected_asc = [int(a) for a in selected_asc]
+                filtered = [r for r in filtered if r["ascension"] in selected_asc]
 
             sort_key_map = {
                 "Date": lambda r: r["timestamp"],
@@ -430,24 +429,39 @@ if target_folder and os.path.exists(target_folder):
             m5.metric("Avg Floor", f"{avg_floor:.1f}")
             m6.metric("Highest Ascension", max_asc)
 
+            if "run_view_mode" not in st.session_state:
+                st.session_state.run_view_mode = "table"
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("📋 Table View", use_container_width=True,
+                            type="primary" if st.session_state.run_view_mode == "table" else "secondary",
+                            on_click=streamlit_widgets.set_active, args=("table",)):
+                    st.session_state.run_view_mode = "table"
+            with col2:
+                if st.button("📈 Graph View", use_container_width=True,
+                            type="primary" if st.session_state.run_view_mode == "graph" else "secondary",
+                            on_click=streamlit_widgets.set_active, args=("graph",)):
+                    st.session_state.run_view_mode = "graph"
             st.markdown("---")
 
-            # ── Build the run history HTML table ──────────────────────────────
-            table_html = build_run_history_table_html(filtered)
+            if st.session_state.run_view_mode == "table":
+                table_html = build_run_history_table_html(filtered)
 
-            component_html = (
-                f"<style>body{{background:#0d0d1a;margin:0;padding:0}}"
-                f"table{{border-radius:8px;overflow:hidden}}"
-                f"tr:hover td{{background:#222240!important;transition:background 0.1s}}"
-                f"{DECK_CSS}</style>"
-                f"{table_html}"
-                f"<script>{DECK_JS}</script>"
-            )
-
-            row_h = 38
-            header_h = 50
-            height_px = min(len(filtered) * row_h + header_h + 30, 10000)
-            st.iframe(component_html, height=height_px)
+                component_html = (
+                    f"<style>body{{background:#0d0d1a;margin:0;padding:0}}"
+                    f"table{{border-radius:8px;overflow:hidden}}"
+                    f"tr:hover td{{background:#222240!important;transition:background 0.1s}}"
+                    f"{DECK_CSS}</style>"
+                    f"{table_html}"
+                    f"<script>{DECK_JS}</script>"
+                )
+                row_h = 38
+                header_h = 50
+                height_px = min(len(filtered) * row_h + header_h + 30, 10000)
+                st.iframe(component_html, height=height_px)
+            elif st.session_state.run_view_mode == "graph":
+                graph_html = build_run_history_graph_html(filtered)
+                st.iframe(graph_html, height=600)
 
         else:
             st.info(f"No valid {'solo' if history_mode == 'SP' else 'multiplayer'} runs found in the specified directory.")
