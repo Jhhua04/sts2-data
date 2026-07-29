@@ -1,6 +1,6 @@
 import datetime
 import html
-import json
+import plotly.graph_objects as go
 import re
 from wiki_urls import wiki_enemy_image_url, wiki_image_url, wiki_relic_image_url
 
@@ -469,12 +469,6 @@ DECK_JS = """
 })();
 """
 
-_RUN_CHAR_COLORS = {
-    "Ironclad": "#D62000", "Silent": "#5EBD00", "Defect": "#3EB3ED",
-    "Regent": "#E36600", "Necrobinder": "#CD4EED", "Colorless": "#A3A3A3",
-}
-
-
 def _asc_badge(asc: int) -> str:
     if asc == 0:
         color = "#22f379"
@@ -507,7 +501,7 @@ def build_run_history_table_html(filtered) -> str:
         raw_char = r.get("character", "")
         char_display = html.escape(str(raw_char))
         killed_by_display = html.escape(str(r["killed_by"])) if r["killed_by"] else ""
-        char_color = _RUN_CHAR_COLORS.get(raw_char, "#aaa")
+        char_color = _CHAR_COLORS.get(raw_char, "#aaa")
         killed_cell = (
             f'<span style="color:#e74c3c;font-size:12px">{killed_by_display}</span>'
             if killed_by_display else
@@ -515,13 +509,23 @@ def build_run_history_table_html(filtered) -> str:
         )
         row_bg = "#1a1a2e" if i % 2 == 0 else "#16162a"
         deck_cards = r.get("deck") or []
+        deck_cards_url = []
+        for name in deck_cards:
+            if name:
+                is_upgraded = name.endswith("+")
+                url_name = name.rstrip("+").lower().replace(" ", "_").replace("-", "_")
+                url_name = re.sub(r'[^a-zA-Z0-9_+]', '', url_name)
+                if url_name in ("strike", "defend"):
+                    url_name += "_" + r.get("character", "").lower()
+                if is_upgraded:
+                    url_name += "_upg"
+                deck_cards_url.append(url_name)
+            else:
+                deck_cards_url.append(name)
         deck_items_html = "".join(
-            (lambda n=name: (
-                f'<div class="deck-card"'
-                f' data-img="{wiki_image_url(n.rstrip("+"), raw_char, n.endswith("+"), False)}"'
-                f'>{html.escape(n)}</div>'
-            ))()
-            for name in deck_cards if name
+            f'<div class="deck-card" data-img="https://cdn.spire-codex.com/cards-full/stable/{url_name}.webp">{html.escape(orig_name)}</div>'
+            for orig_name, url_name in zip(deck_cards, deck_cards_url) 
+            if orig_name
         )
         rows_html.append(
             f'<tr style="background:{row_bg}">'
@@ -564,145 +568,144 @@ def build_run_history_table_html(filtered) -> str:
     return table_html
 
 def build_run_history_graph_html(filtered) -> str:
-    """Builds an HTML string containing an interactive Chart.js line/scatter plot
-    of run history, showing floors reached on the Y-axis and run number on the X-axis.
+    # Process data in chronological order
+    runs = filtered[::-1]
     
-    `filtered` is a list of run dicts with keys: timestamp, win,
-    character, ascension, deck_size, deck, floor, killed_by.
-    """
-    labels = []
+    run_numbers = []
+    timestamps = [] # <-- 1. Create a list to hold all timestamps
     floors = []
-    point_colors = []
-    run_details = []
+    ascensions = []
+    deck_sizes = []
+    colors = []
+    hover_texts = []
+    
+    for i, r in enumerate(runs):
+        run_no = i + 1
+        run_numbers.append(run_no)
 
-    for i, r in enumerate(filtered):
-        # Run number on X-axis (1-indexed based on current sorted view)
-        labels.append(i + 1)
-        floors.append(r.get("floor", 0))
+        # 2. Append standard ISO datetime strings for Plotly to parse
+        iso_ts = datetime.datetime.fromtimestamp(r["timestamp"]).isoformat()
+        timestamps.append(iso_ts)
+
+        # 3. Keep your formatted dt for the hover text
+        dt = datetime.datetime.fromtimestamp(r["timestamp"]).strftime("%Y-%m-%d %H:%M")
+        floor = r.get("floor", 0)
+        asc = r.get("ascension", 0)
+        deck = r.get("deck_size", 0)
         
-        # Determine node color: Green for win, Red for loss
+        floors.append(floor)
+        ascensions.append(asc)
+        deck_sizes.append(deck)
+        
         win = r.get("win", False)
-        point_colors.append("#2ecc71" if win else "#e74c3c")
+        colors.append("#2ecc71" if win else "#e74c3c")
         
-        # Safely escape strings for tooltips
         char = html.escape(str(r.get("character", "Unknown")))
         killed_by = html.escape(str(r.get("killed_by", ""))) if not win else ""
+        killed_by_text = re.sub(r'(\w+)(\W*)$', r'(\1)\2', killed_by)
+        outcome = "Victory" if win else f"Killed by {killed_by_text}"
         
-        run_details.append({
-            "character": char,
-            "ascension": r.get("ascension", 0),
-            "win": win,
-            "killed_by": killed_by
-        })
+        # Build HTML-formatted string for the Plotly tooltip
+        hover_text = (
+            f"<b>Run #{run_no}</b><br><br>"
+            f"Floor: {floor}<br>"
+            f"Ascension: A{asc}<br>"
+            f"Deck Size: {deck}<br>"
+            f"Character: {char}<br>"
+            f"Outcome: {outcome}<br>"
+            f"Date: {dt}"
+        )  
+        hover_texts.append(hover_text)
 
-    # Serialize data into JSON strings to inject safely into the JavaScript block
-    labels_json = json.dumps(labels)
-    floors_json = json.dumps(floors)
-    colors_json = json.dumps(point_colors)
-    details_json = json.dumps(run_details)
+    # Build the base figure (defaults to Floors Reached)
+    fig = go.Figure()
 
-    html_str = f"""
-    <style>
-        body, html {{ margin: 0; padding: 0; background: #0d0d1a; height: 100%; }}
-        .chart-container {{
-            position: relative;
-            height: 95vh;
-            width: 100%;
-            background: #12121f;
-            border: 1px solid #333355;
-            border-radius: 8px;
-            padding: 15px;
-            box-sizing: border-box;
-        }}
-    </style>
-    
-    <div class="chart-container">
-        <canvas id="runChart"></canvas>
-    </div>
-    
-    <!-- Load Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <script>
-        const ctx = document.getElementById('runChart').getContext('2d');
-        const labels = {labels_json};
-        const floors = {floors_json};
-        const pointColors = {colors_json};
-        const details = {details_json};
+    fig.add_trace(
+        go.Scatter(
+            x=run_numbers,
+            y=floors,
+            mode='lines+markers',
+            line=dict(color='rgba(91, 141, 238, 0.4)', width=2),
+            marker=dict(
+                color=colors, 
+                size=10,
+                line=dict(color='#12121f', width=2)
+            ),
+            text=hover_texts,
+            hovertemplate="%{text}<extra></extra>"
+        )
+    )
 
-        new Chart(ctx, {{
-            type: 'line',
-            data: {{
-                labels: labels,
-                datasets: [{{
-                    label: 'Floors Reached',
-                    data: floors,
-                    borderColor: 'rgba(91, 141, 238, 0.4)', // Faint blue line connecting runs
-                    backgroundColor: pointColors,
-                    pointBackgroundColor: pointColors,
-                    pointBorderColor: '#12121f', // Match background
-                    pointRadius: 6,
-                    pointHoverRadius: 9,
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.1
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        title: {{ display: true, text: 'Floor Reached', color: '#8888aa', font: {{size: 14}} }},
-                        ticks: {{ color: '#8888aa' }},
-                        grid: {{ color: '#2a2a4a' }}
-                    }},
-                    x: {{
-                        title: {{ display: true, text: 'Run Number', color: '#8888aa', font: {{size: 14}} }},
-                        ticks: {{ color: '#8888aa' }},
-                        grid: {{ color: '#2a2a4a' }}
-                    }}
-                }},
-                plugins: {{
-                    legend: {{ display: false }},
-                    tooltip: {{
-                        backgroundColor: 'rgba(26, 26, 46, 0.95)',
-                        titleColor: '#ffffff',
-                        bodyColor: '#cccccc',
-                        borderColor: '#333355',
-                        borderWidth: 1,
-                        padding: 12,
-                        titleFont: {{ size: 14 }},
-                        bodyFont: {{ size: 13, lineHeight: 1.5 }},
-                        displayColors: false,
-                        callbacks: {{
-                            title: function(context) {{
-                                return 'Run #' + context[0].label;
-                            }},
-                            label: function(context) {{
-                                const index = context.dataIndex;
-                                const run = details[index];
-                                const lines = [];
-                                
-                                lines.push('Floor: ' + context.parsed.y);
-                                lines.push('Character: ' + run.character + ' (A' + run.ascension + ')');
-                                
-                                if (run.win) {{
-                                    lines.push('Outcome: ✅ Victory');
-                                }} else {{
-                                    lines.push('Outcome: 💀 Defeat');
-                                    if (run.killed_by) {{
-                                        lines.push('Killed by: ' + run.killed_by);
-                                    }}
-                                }}
-                                return lines;
-                            }}
-                        }}
-                    }}
-                }}
-            }}
-        }});
-    </script>
-    """
-    return html_str
+    # Configure Layout, Styling, and the Dropdown Menu
+    fig.update_layout(
+        plot_bgcolor='#12121f',
+        paper_bgcolor='#0d0d1a',
+        font=dict(color='#8888aa', family="sans-serif"),
+        margin=dict(t=80, b=40, l=60, r=40),
+        
+        xaxis=dict(title='Run Number', gridcolor='#2a2a4a', zerolinecolor='#2a2a4a'),
+        yaxis=dict(title='Floor', gridcolor='#2a2a4a', zerolinecolor='#2a2a4a', rangemode='tozero'),
+        
+        hoverlabel=dict(bgcolor='rgba(26, 26, 46, 0.95)', font_size=13, font_color='#ffffff', bordercolor='#333355'),
+        
+        updatemenus=[
+            # X-AXIS DROPDOWN
+            dict(
+                active=0,
+                direction="down",
+                x=0.25,
+                xanchor="left",
+                y=1.15,
+                yanchor="top",
+                font=dict(color="#cccccc"),
+                bgcolor="#12121f",
+                bordercolor="#333355",
+                buttons=[
+                    dict(
+                        label="X: Run Number", 
+                        method="update", 
+                        args=[
+                            {"x": [run_numbers], "mode": "lines+markers"}, 
+                            {
+                                "xaxis.title.text": "Run Number",
+                                "xaxis.type": "linear",
+                                "xaxis.tickformat": ""
+                            }
+                        ]
+                    ),      
+                    dict(
+                        label="X: Timestamp", 
+                        method="update", 
+                        args=[
+                            # 4. Pass the full list of timestamps here instead of [dt]
+                            {"x": [timestamps], "mode": "markers"}, 
+                            {
+                                "xaxis.title.text": "Date / Time",
+                                "xaxis.type": "date",
+                                "xaxis.tickformat": "%-m-%-d-%Y" 
+                            }
+                        ]
+                    ),
+                ]
+            ),
+            # Y-AXIS DROPDOWN
+            dict(
+                active=0,
+                direction="down",
+                x=0.0,
+                xanchor="left",
+                y=1.15,
+                yanchor="top",
+                font=dict(color="#cccccc"),
+                bgcolor="#12121f",
+                bordercolor="#333355",
+                buttons=[
+                    dict(label="Y: Floors", method="update", args=[{"y": [floors]}, {"yaxis.title.text": "Floor"}]),
+                    dict(label="Y: Ascension", method="update", args=[{"y": [ascensions]}, {"yaxis.title.text": "Ascension"}]),
+                    dict(label="Y: Deck Size", method="update", args=[{"y": [deck_sizes]}, {"yaxis.title.text": "Cards"}])
+                ]
+            ),
+        ]
+    )
+
+    return fig.to_html(full_html=False, include_plotlyjs='cdn')

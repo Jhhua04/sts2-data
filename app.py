@@ -448,7 +448,7 @@ if target_folder and os.path.exists(target_folder):
                 table_html = build_run_history_table_html(filtered)
 
                 component_html = (
-                    f"<style>body{{background:#0d0d1a;margin:0;padding:0}}"
+                    f"<style min-hei>body{{background:#0d0d1a;margin:0;padding:0}}"
                     f"table{{border-radius:8px;overflow:hidden}}"
                     f"tr:hover td{{background:#222240!important;transition:background 0.1s}}"
                     f"{DECK_CSS}</style>"
@@ -458,7 +458,7 @@ if target_folder and os.path.exists(target_folder):
                 row_h = 38
                 header_h = 50
                 height_px = min(len(filtered) * row_h + header_h + 30, 10000)
-                st.iframe(component_html, height=height_px)
+                st.iframe(component_html, height=height_px+600)
             elif st.session_state.run_view_mode == "graph":
                 graph_html = build_run_history_graph_html(filtered)
                 st.iframe(graph_html, height=600)
