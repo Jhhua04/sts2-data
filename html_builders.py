@@ -14,9 +14,6 @@ def clean_enemy_name(raw_id: str) -> str:
     spaced = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', part)
     return spaced.title()
 
-
-# Encounter names: strip generic prefixes like "Test_Subject_" and normalise
-# Boss/Elite suffixes so we get e.g. "Doormaker Boss" or "Slime Elite".
 _FILLER_PREFIXES = re.compile(
     r'^(test_subject|encounter|unknown)[_\s]+', re.IGNORECASE
 )
@@ -572,7 +569,7 @@ def build_run_history_graph_html(filtered) -> str:
     runs = filtered[::-1]
     
     run_numbers = []
-    timestamps = [] # <-- 1. Create a list to hold all timestamps
+    timestamps = []
     floors = []
     ascensions = []
     deck_sizes = []

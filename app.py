@@ -19,8 +19,8 @@ from ui_styles import SHARED_CSS, TOOLTIP_JS
 import tempfile
 from config import SAVE_FILE_PATH, PLAYER_ID
 
-st.set_page_config(page_title="StS2 Run Analytics", layout="wide")
-st.title("🃏 Slay the Spire 2: Run Analytics Dashboard")
+st.set_page_config(page_title="Slay the Spire 2 Run Analytics", layout="wide")
+st.title("Slay the Spire 2: Run Analytics Dashboard")
 
 # ── Top-level page toggle ───────────────────────────────────────────────────
 data_source = st.sidebar.radio(
@@ -38,7 +38,7 @@ if data_source == "Demo Data":
     target_folder = "example_runs"
     player_id = PLAYER_ID
     if not os.path.exists(target_folder):
-        st.sidebar.error(f"⚠️ Directory '{target_folder}' not found. Please create it and add example JSON files.")
+        st.sidebar.error(f"⚠️ Directory '{target_folder}' not found. This is an error and should be fixed immediately")
 
 elif data_source == "Upload Run Files":
     player_id = None
@@ -46,7 +46,6 @@ elif data_source == "Upload Run Files":
         "Upload Slay the Spire 2 RUN files",
         type=["run"],
         accept_multiple_files=True,
-        help="Navigate to your AppData/SlaytheSpire2 history folder and upload the RUN files."
     )
     player_id_col, clear_id_col = st.sidebar.columns([3, 1], vertical_alignment="bottom")
     with player_id_col:
@@ -79,7 +78,9 @@ elif data_source == "Upload Run Files":
                                          on_change=streamlit_widgets.update_player_id)            
             st.stop()
     else:
-        st.info("📤 Upload one or more RUN files in the sidebar to view your custom dashboard.")
+        st.info("📤 Upload one or more RUN files in the sidebar to view your own dashboard. Runs should be at" \
+        r" C:\Users\\{Username}\AppData\Roaming\SlayTheSpire2\steam\\{steamId}\profile1\saves\history" \
+        "")
 
 elif data_source == "Local Path (Dev)":
     player_id = PLAYER_ID
