@@ -3,31 +3,48 @@ import get_json
 
 with open("cards.json") as f:
     _monster_json = get_json.get_json("monsters.json", "monsters", ["id", "name", "type", "image_url"])
+    _cards_json = get_json.get_json("cards.json", "cards", ["id", "name", "image_url_card", "image_url_card_upg"])
+    _relics_json = get_json.get_json("relics.json", "relics", ["id", "name", "image_url"])
 _MONSTER_BY_ID = {r["id"]: r for r in _monster_json}
-
+_CARDS_BY_NAME = {r["name"]: r for r in _cards_json}
+_RELICS_BY_NAME = {r["name"]: r for r in _relics_json}
 # ── Card name fixes ───────────────────────────────────────────────────────────
-odd_relic_names = {"MeatOnTheBone" : "MeatontheBone", "SelfFormingClay": "Self-FormingClay", "SlingOfCourage" : "SlingofCourage", "TriBoomerang" : "Tri-Boomerang", 
-                   "SwordOfJade" : "SwordofJade", "BagOfPreparation" : "BagofPreparation", "TeaOfDiscourtesy" : "TeaofDiscourtesy",
-                   "ArtOfWar" : "ArtofWar", "BagOfMarbles" : "BagofMarbles", "DaughterOfTheWind" : "DaughteroftheWind", "ChosenCheese" : "TheChosenCheese",
-                   "BloodSoakedRose" : "Blood-SoakedRose", "BookOfFiveRings" : "BookofFiveRings", "GoldPlatedCables" : "Gold-PlatedCables", "SealOfGold" : "SealofGold",
-                   "SwordOfStone" : "SwordofStone", "RingOfTheSnake" : "RingoftheSnake", "Seaglass" : "SeaGlass", "RingOfTheDrake" : "RingoftheDrake"}
-gif_cards = ["Mad Science"]
-oddities = {"Howl from Beyond": "HowlFromBeyond", "Drum of Battle": "DrumOfBattle", "Pull from Below" : "PullFromBelow"}
+odd_relic_names = {
+    "Blood Soaked Rose": "Blood-Soaked Rose",
+    "Fake Anchor": "Anchor???",
+    "Fake Blood Vial": "Blood Vial???",
+    "Fake Happy Flower": "Happy Flower???",
+    "Fake Lees Waffle": "Lee's Waffle???",
+    "Fake Mango": "Mango???",
+    "Fake Merchants Rug": "The Merchant's Rug???",
+    "Fake Orichalcum": "Orichalcum???",
+    "Fake Snecko Eye": "Snecko Eye???",
+    "Fake Strike Dummy": "Strike Dummy???",
+    "Fake Venerable Tea Set": "Venerable Tea Set???",
+    "Gold Plated Cables": "Gold-Plated Cables",
+    "Lords Parasol": "Lord's Parasol",
+    "Sea Glass": "Sea Glass",
+    "Self Forming Clay": "Self-Forming Clay",
+    "Tri Boomerang": "Tri-Boomerang",
+    "Tanxs Whistle": "Tanx's Whistle",
+    "Captains Wheel": "Captain's Wheel",
+    "Mr Struggles": "Mr. Struggles",
+    "Dollys Mirror": "Dolly's Mirror",
+    "Pandoras Box": "Pandora's Box",
+    "Wongos Mystery Ticket": "Wongo's Mystery Ticket",
+    "Lees Waffle": "Lee's Waffle",
+}
+gif_cards = ["Mad Science"]\
 
 def wiki_image_url(card_name: str, character: str, upgraded: bool, beta: bool) -> str:
-    if card_name == "Clash" or card_name == "Dual Wield" or card_name == "Entrench":
-        character = "Ironclad"
-    elif card_name == "Caltrops" or card_name == "Distraction" or card_name == "Outmaneuver":
-        character = "Silent"
-    elif card_name == "Hello World" or card_name == "Rebound" or card_name == "Stack" or card_name == "Rip and Tear":
-        character = "Defect"
-    name_slug = re.sub(r'[^a-zA-Z0-9-]', '', card_name)
-    if card_name in oddities:
-        name_slug = oddities[card_name]
-    extension = "gif" if card_name in gif_cards else "png"
-    upgraded_str = "Plus" if upgraded else ""
-    beta_str = "Beta-" if beta else ""
-    return f"https://slaythespire.wiki.gg/images/StS2_{beta_str}{character}-{name_slug}{upgraded_str}.{extension}"
+    if card_name in gif_cards:
+            return f"https://slaythespire.wiki.gg/images/StS2_Colorless-MadScience.gif"
+    if beta:
+        beta_card = re.sub(r"[ ]", "_", card_name)
+        beta_card = re.sub(r"[^a-zA-Z0-9_]", "", beta_card).lower()
+        return f"https://cdn.spire-codex.com/game/v0.107.1/cards/beta/{beta_card}_plus.webp" if upgraded else f"https://cdn.spire-codex.com/game/v0.107.1/cards/beta/{beta_card}.webp"
+    image_url = _CARDS_BY_NAME.get(card_name).get("image_url_card_upg" if upgraded else "image_url_card")
+    return image_url
 
 def wiki_enemy_image_url(enemy_name: str) -> str:
     if enemy_name == "Doormaker":
@@ -40,7 +57,17 @@ def wiki_enemy_image_url(enemy_name: str) -> str:
     return f"https://spire-codex.com{image_url}"
 
 def wiki_relic_image_url(relic_name: str) -> str:
-    name_slug = relic_name.replace(" ", "")
-    if name_slug in odd_relic_names:
-        name_slug = odd_relic_names[name_slug]
-    return f"https://slaythespire.wiki.gg/images/StS2_{name_slug}.png"
+    if relic_name in odd_relic_names:
+        relic_name = odd_relic_names[relic_name]
+    if "Paels" in relic_name:
+        relic_name = re.sub(r"Paels", "Pael's", relic_name)
+    if "Neows" in relic_name:
+        relic_name = re.sub(r"Neows", "Neow's", relic_name)
+    relic_name = re.sub(
+        r"\b(Of|On|(?<!^)The)\b", 
+        lambda m: m.group(0).lower(), 
+        relic_name
+        )
+    print(relic_name)
+    image_url = _RELICS_BY_NAME.get(relic_name).get("image_url")
+    return f"https://spire-codex.com{image_url}"
