@@ -1,0 +1,13 @@
+name: Ping Streamlit App Daily
+
+on:
+  schedule:
+    - cron: '0 */10 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the app
+        run: curl -sSf https://jhua-slaythespire2-data.streamlit.app/ || exit 1
