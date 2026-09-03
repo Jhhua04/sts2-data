@@ -33,6 +33,7 @@ odd_relic_names = {
     "Pandoras Box": "Pandora's Box",
     "Wongos Mystery Ticket": "Wongo's Mystery Ticket",
     "Lees Waffle": "Lee's Waffle",
+    "Chosen Cheese" : "The Chosen Cheese",
 }
 gif_cards = ["Mad Science"]\
 
