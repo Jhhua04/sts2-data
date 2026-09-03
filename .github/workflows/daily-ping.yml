@@ -1,5 +1,4 @@
 name: Ping Streamlit App Daily
-
 on:
   schedule:
     - cron: '0 */8 * * *'
@@ -9,5 +8,35 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping the app
-        run: curl -sSf https://jhua-slaythespire2-data.streamlit.app/ || exit 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Visit app with real browser to keep it awake
+        run: |
+          python - <<'EOF'
+          from playwright.sync_api import sync_playwright
+
+          URL = "https://jhua-slaythespire2-data.streamlit.app/"
+
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page()
+              page.goto(URL, wait_until="domcontentloaded", timeout=120_000)
+              page.wait_for_timeout(5000)
+
+              wake_btn = page.get_by_role("button", name="Yes, get this app back up!")
+              if wake_btn.count() > 0:
+                  print(f"App was asleep, waking: {URL}")
+                  wake_btn.click()
+                  page.wait_for_timeout(60_000)
+              else:
+                  print(f"App already awake: {URL}")
+
+              browser.close()
+          EOF
