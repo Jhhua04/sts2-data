@@ -34,6 +34,8 @@ odd_relic_names = {
     "Wongos Mystery Ticket": "Wongo's Mystery Ticket",
     "Lees Waffle": "Lee's Waffle",
     "Chosen Cheese" : "The Chosen Cheese",
+    "Charons Ashes" : "Charon's Ashes",
+    "Philosophers Stone" : "Philosopher's Stone",
 }
 gif_cards = ["Mad Science"]\
 
@@ -69,6 +71,6 @@ def wiki_relic_image_url(relic_name: str) -> str:
         lambda m: m.group(0).lower(), 
         relic_name
         )
-    print(relic_name)
+    # print(relic_name)
     image_url = _RELICS_BY_NAME.get(relic_name).get("image_url")
     return f"https://spire-codex.com{image_url}"
